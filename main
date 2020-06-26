@@ -1,0 +1,96 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from keras.models import Sequential #모델을 순차적으로 정의하는 클래스
+from keras.layers import LSTM, Dropout, Dense, Activation #LSTM레이어
+from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau
+import datetime
+import os
+
+#Load Dataset
+data = pd.read_csv('C:\\data_new.csv') #csv 파일 로드
+data.head() #데이터 프레임의 맨 앞 5줄 출력
+
+#Compute Mid Price
+high_prices = data['High'].values
+low_prices = data['Low'].values
+mid_prices = (high_prices + low_prices) / 2
+
+#Create Windows
+seq_len = 30 #윈도우 크기
+sequence_length = seq_len + 1 
+
+result = []
+for index in range(len(mid_prices) - sequence_length):
+    result.append(mid_prices[index: index + sequence_length])
+   
+#Normalize Data
+def normalize_windows(data):
+    normalized_data = []
+    for window in data:
+        normalized_window = [((float(p) / float(window[0])) - 1) for p in window]
+        normalized_data.append(normalized_window)
+    return np.array(normalized_data)
+
+
+def makeDir(dirName):
+    try:
+        if not(os.path.isdir(dirName)):
+            os.makedirs(os.path.join(dirName))
+    except OSError:
+        print("Failed to create directory!!!!!")
+
+
+result = normalize_windows(result)
+
+# split train and test data
+row = int(round(result.shape[0] * 0.8))
+train = result[:row, :]
+np.random.shuffle(train) #트레이닝 셋이 익숙해지지 않도록 배열의 값을 랜덤으로 섞는다
+
+x_train = train[:, :-1] #30개
+x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
+y_train = train[:, -1] #1개
+
+x_test = result[row:, :-1] #30개
+x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
+y_test = result[row:, -1] #1개
+
+x_train.shape, x_test.shape
+
+#Build a Model
+model = Sequential()
+
+model.add(LSTM(30, return_sequences=True, input_shape=(30, 1))) #모델에 레이어를 추가한다
+
+model.add(LSTM(200, return_sequences=False))
+
+model.add(Dense(1, activation='linear'))
+
+model.compile(loss='mse', optimizer='rmsprop') #mse = Mean Squared Error 손실함수
+
+model.summary() #모델의 개요를 출력한다
+
+start_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+
+#Training
+model.fit(x_train, y_train,
+    validation_data=(x_test, y_test),
+    batch_size=10, #한번에 10개씩 묶어서 학습시킨다
+    epochs=20, #20번 동안 반복학습
+    callbacks=[
+        TensorBoard(log_dir=os.path.join(start_time), histogram_freq = 1, profile_batch = 100000000),
+        ModelCheckpoint(os.path.join('models_' + start_time), monitor='val_loss', verbose=1, save_best_only=True, mode='auto'),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, verbose=1, mode='auto')
+]) #모델을 학습시킨다
+
+#Prediction
+pred = model.predict(x_test) #모델을 사용하여 예측한다
+
+fig = plt.figure(facecolor='white', figsize=(20, 10))
+ax = fig.add_subplot(111)
+ax.plot(y_test, label='True')
+ax.plot(pred, label='Prediction')
+ax.legend()
+plt.show()
+
