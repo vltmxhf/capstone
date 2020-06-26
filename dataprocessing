@@ -1,0 +1,53 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.util.StringTokenizer;
+
+public class WeekendInserter {
+	private String inputFolder = "C:\\weekendInput\\";
+	private String outputFolder = "C:\\weekendOutput\\";
+	
+	public static void main(String[] args){
+		WeekendInserter wi = new WeekendInserter();
+		wi.filter("bitcoin", "gold");
+	}
+
+	private void filter(String bitcoinFileName, String goldFileName) {
+		try{
+			File bitcoinFile = new File(inputFolder + bitcoinFileName + ".csv");
+			BufferedReader bitcoinReader = new BufferedReader(new FileReader(bitcoinFile));
+			
+			File goldFile = new File(inputFolder + goldFileName + ".csv");
+			BufferedReader goldReader = new BufferedReader(new FileReader(goldFile));
+			
+			File fileForWrite = new File(outputFolder + "data7" + ".csv");
+			BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(fileForWrite));
+
+			String bitcoinLine = "";
+			String goldLine = "";
+			String line = ""; // 결과
+			String currentGold = "";
+
+			goldLine = goldReader.readLine();
+
+			while((bitcoinLine = bitcoinReader.readLine()) != null){
+								
+				if(bitcoinLine.substring(0, 5).equals(goldLine.substring(0, 5))) {
+					currentGold = goldLine.substring(6);
+					line = bitcoinLine + "," + goldLine.substring(6);
+					goldLine = goldReader.readLine();
+				} else {
+					line = bitcoinLine + "," + currentGold;
+				}
+				System.out.println(line);
+				
+				bufferedWriter.write(line);
+				bufferedWriter.newLine();
+			}
+		} catch(Exception e){
+			e.printStackTrace();
+		}
+	}
+}
